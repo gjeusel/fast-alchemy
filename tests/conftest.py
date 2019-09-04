@@ -5,15 +5,12 @@ import pytest
 import sqlalchemy as sa
 
 
-@pytest.fixture(scope='function')
+@pytest.yield_fixture(scope='function')
 def temp_file(request):
-    _, path = tempfile.mkstemp(suffix='.py')
-
-    def remove_file():
-        os.remove(path)
-
-    request.addfinalizer(remove_file)
-    return path
+    fd, path = tempfile.mkstemp(suffix='.py')
+    yield path
+    os.close(fd)
+    os.remove(path)
 
 
 @pytest.fixture(scope='function')

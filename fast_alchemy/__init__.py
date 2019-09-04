@@ -144,6 +144,12 @@ class InstanceLoader:
         return ','.join(names)
 
 
+MAPPING_REGISTRY = {
+    'FastAlchemy': 'fast_alchemy',
+    'FlaskFastAlchemy': 'flask_sqlalchemy',
+}
+
+
 class FastAlchemy:
     def __init__(self, base, session, **kwargs):
         self.Model = base
@@ -231,7 +237,8 @@ class FastAlchemy:
         self.execute_for(self.get_tables(models), 'drop_all')
         for class_name in models or self.class_registry.keys():
             reg = self.Model._decl_class_registry['_sa_module_registry']
-            reg.contents[__name__]._remove_item(class_name)
+            reg_name = MAPPING_REGISTRY[self.__class__.__name__]
+            reg.contents[reg_name]._remove_item(class_name)
             self.Model._decl_class_registry.pop(class_name)
             self.Model.metadata.remove(
                 self.Model.metadata.tables[class_name.lower()])

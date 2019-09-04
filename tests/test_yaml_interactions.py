@@ -1,38 +1,18 @@
 import importlib
 import os
-import tempfile
 
-import pytest
-import sqlalchemy as sa
-from fast_alchemy import FastAlchemy, FlaskFastAlchemy
-from fast_alchemy.export import FastAlchemyExporter
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+
+from fast_alchemy import FastAlchemy, FlaskFastAlchemy
+from fast_alchemy.export import FastAlchemyExporter
 
 ROOT_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 
 
-@pytest.fixture(scope='function')
-def temp_file(request):
-    _, path = tempfile.mkstemp(suffix='.py')
-
-    def remove_file():
-        os.remove(path)
-
-    request.addfinalizer(remove_file)
-    return path
-
-
-def test_it_can_load_instances():
-    engine = sa.create_engine('sqlite:///:memory:')
-    Base = sa.ext.declarative.declarative_base()
-    Base.metadata.bind = engine
-    Session = sa.orm.sessionmaker(
-        autocommit=False, autoflush=False, bind=engine)
-    session = sa.orm.scoped_session(Session)
-
-    fa = FastAlchemy(Base, session)
+def test_it_can_load_instances(ModelBase, session):
+    fa = FastAlchemy(ModelBase, session)
     with fa:
         fa.load(os.path.join(DATA_DIR, 'instances.yaml'))
     fa.load(os.path.join(DATA_DIR, 'instances.yaml'))

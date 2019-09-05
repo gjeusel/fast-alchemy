@@ -1,7 +1,10 @@
 from collections import defaultdict
 
 import sqlalchemy as sa
-from fast_alchemy import ClassInfo, FastAlchemy, FieldInfo, Options
+
+from .fast import FastAlchemy, Options
+from .class_builder import FieldInfo
+from .loader_orchestrator import ClassInfo
 
 NO_COLUMN_FOR = ['relationship']
 FIELD_LOCATION_STRINGS = {sa: 'sa', sa.orm: 'sa.orm'}

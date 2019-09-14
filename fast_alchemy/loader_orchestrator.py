@@ -26,11 +26,11 @@ class BaseModelLoader(metaclass=ABCMeta):
         self.class_registry = class_registry
 
     @abstractmethod
-    def load(self):
+    def parse_class_definition(self, class_definition):
         pass
 
     @abstractmethod
-    def parse_class_definition(self, class_definition):
+    def load_yml(self):
         pass
 
 
@@ -46,9 +46,10 @@ def _parse_class_definition(base, class_registry, class_definition):
 
 class ModelLoader(BaseModelLoader):
     def parse_class_definition(self, class_definition):
-        return _parse_class_definition(self.Model, self.class_registry, class_definition)
+        return _parse_class_definition(self.Model, self.class_registry,
+                                       class_definition)
 
-    def load(self, raw):
+    def load_yml(self, raw):
         for class_definition, fields in raw.items():
             class_info = self.parse_class_definition(class_definition)
             yield class_info, fields['definition']
@@ -59,7 +60,11 @@ class BaseInstanceLoader(metaclass=ABCMeta):
         self.classes = classes
 
     @abstractmethod
-    def load(self, class_info, ref_name, instances, instance_refs):
+    def load_yml(self, class_info, ref_name, instances, instance_refs):
+        pass
+
+    @abstractmethod
+    def load_xlsx(self, class_info, ref_name, instances, instance_refs):
         pass
 
 
@@ -70,17 +75,6 @@ class InstanceLoader(BaseInstanceLoader):
             if rel.direction.name == 'MANYTOONE':
                 relations.append(rel.key)
         return relations
-
-    def load(self, file_or_raw, class_info, ref_name, instances,
-             instance_refs):
-        klass = self.classes[class_info.class_name]
-        for definition in instances:
-            for relation in self._scan_relations(klass):
-                clean_ref = self.clean_ref(definition[relation])
-                related_instance = instance_refs[clean_ref]
-                definition[relation] = related_instance
-            instance = klass(**definition)
-            instance_refs[self.build_ref(definition, ref_name)] = instance
 
     def build_ref(self, definition, ref_name):
         names = []
@@ -95,13 +89,43 @@ class InstanceLoader(BaseInstanceLoader):
             names.append(name.strip())
         return ','.join(names)
 
+    def _one_definition_load_yml(self, class_info, ref_name, instances,
+                                 instance_refs):
+        klass = self.classes[class_info.class_name]
+        for definition in instances:
+            for relation in self._scan_relations(klass):
+                clean_ref = self.clean_ref(definition[relation])
+                related_instance = instance_refs[clean_ref]
+                definition[relation] = related_instance
+            instance = klass(**definition)
+            instance_refs[self.build_ref(definition, ref_name)] = instance
+
+    def load_yml(self, class_info, raw):
+        instance_refs = {}
+        for class_definition, fields in raw:
+            if not fields.get('instances'):
+                continue
+            self._one_definition_load_yml(class_info, fields['ref'],
+                                          fields['instances'], instance_refs)
+
+        return instance_refs
+
+    def load_xlsx(self, class_info, raw):
+        raise NotImplementedError
+
+
+METHOD_MAPPING = {
+    'yml': 'load_yml',
+    'xlsx': 'load_xlsx',
+}
+
 
 class LoaderOrchestrator:
     def __init__(self, model_loader, instance_loader):
         self.model_loader = model_loader
         self.instance_loader = instance_loader
 
-    def _load_file(self, file_or_raw):
+    def _load_file(self, file_or_raw, ft=None):
         raw = file_or_raw
         if isinstance(file_or_raw, str):
 
@@ -109,24 +133,32 @@ class LoaderOrchestrator:
             if file_or_raw.lower().endswith(('.yml', '.yaml')):
                 with open(file_or_raw, 'r') as fh:
                     raw = ordered_load(fh)
+                    method = METHOD_MAPPING['yml']
 
             # EXCEL
             elif file_or_raw.lower().endswith('.xlsx'):
+                if not HAS_OPENPYXL:
+                    msg = 'For Excel files, you need to install openpyxl.'
+                    raise ImportError(msg)
                 raise NotImplementedError
 
-        return raw
+        else:
+            if ft is None:
+                msg = "Can't deduce filetype from io {}"
+                raise Exception(msg.format(msg))
+            if ft.lower() not in METHOD_MAPPING:
+                msg = "Unknown filetype '{}'".format(ft)
+                raise Exception(msg)
+            method = METHOD_MAPPING[ft.lower()]
 
-    def models(self, filepath):
-        raw = self._load_file(filepath)
-        return self.model_loader.load(raw)
+        return raw, method
 
-    def instances(self, filepath):
-        instance_refs = {}
-        for class_definition, fields in self._load_file(filepath):
-            if not fields.get('instances'):
-                continue
-            class_info = self._parse_class_definition(class_definition)
-            self.instance_loader.load(
-                class_info, fields['ref'], fields['instances'], instance_refs)
+    def models(self, filepath, ft=None):
+        raw, method = self._load_file(filepath, ft)
+        fn = getattr(self.model_loader, method)
+        return fn(raw)
 
-        return instance_refs
+    def instances(self, filepath, ft=None):
+        raw, method = self._load_file(filepath, ft)
+        fn = getattr(self.instance_loader, method)
+        return fn(self.model_loader.class_registry, raw)

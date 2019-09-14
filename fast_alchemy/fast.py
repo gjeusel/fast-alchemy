@@ -95,7 +95,7 @@ class FastAlchemy:
         self.create_tables(registry.keys())
 
     def load_instances(self, filepath):
-        instance_refs = self.loader.load_instances(filepath)
+        instance_refs = self.loader.instances(filepath)
 
         # Persist definitions
         self.session.add_all(instance_refs.values())

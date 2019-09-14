@@ -68,7 +68,8 @@ class FastAlchemy:
 
         model_loader = self.options.model_loader(
             base=self.Model, class_registry=self.class_registry)
-        instance_loader = self.options.instance_loader(classes=classes)
+        instance_loader = self.options.instance_loader(
+            base=self.Model, classes=classes)
 
         return LoaderOrchestrator(model_loader, instance_loader)
 

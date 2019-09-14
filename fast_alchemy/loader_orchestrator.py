@@ -56,7 +56,8 @@ class ModelLoader(BaseModelLoader):
 
 
 class BaseInstanceLoader(metaclass=ABCMeta):
-    def __init__(self, classes):
+    def __init__(self, base, classes):
+        self.Model = base
         self.classes = classes
 
     @abstractmethod
@@ -100,17 +101,18 @@ class InstanceLoader(BaseInstanceLoader):
             instance = klass(**definition)
             instance_refs[self.build_ref(definition, ref_name)] = instance
 
-    def load_yml(self, class_info, raw):
+    def load_yml(self, raw):
         instance_refs = {}
-        for class_definition, fields in raw:
+        for class_definition, fields in raw.items():
             if not fields.get('instances'):
                 continue
+            class_info = _parse_class_definition(self.Model, self.classes, class_definition)
             self._one_definition_load_yml(class_info, fields['ref'],
                                           fields['instances'], instance_refs)
 
         return instance_refs
 
-    def load_xlsx(self, class_info, raw):
+    def load_xlsx(self, raw):
         raise NotImplementedError
 
 
@@ -161,4 +163,4 @@ class LoaderOrchestrator:
     def instances(self, filepath, ft=None):
         raw, method = self._load_file(filepath, ft)
         fn = getattr(self.instance_loader, method)
-        return fn(self.model_loader.class_registry, raw)
+        return fn(raw)

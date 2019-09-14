@@ -13,7 +13,7 @@ class BaseFieldBuilder(metaclass=ABCMeta):
 
 
 class FieldBuilder(BaseFieldBuilder):
-    def build_field(self, field_info, class_name, backrefs):
+    def build(self, field_info, class_name, backrefs):
         fields = {}
         kwargs = {}
 

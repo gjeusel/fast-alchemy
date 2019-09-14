@@ -83,8 +83,9 @@ class FastAlchemy:
             klass = self.class_builder.build(class_info, definition)
             registry[class_info.class_name] = klass
 
-        # Add subset registry to attribute class_registry
-        self.class_registry.update(registry)
+            # We also need to update self.class_registry here as it is used by
+            # the loader
+            self.class_registry[class_info.class_name] = klass
 
         # if in context, keep track of it
         if self.in_context:
@@ -157,7 +158,7 @@ class FastAlchemy:
             models (iterable): keys of the registry for which we want to create the tables.
         """
         tables = self.get_tables(models)
-        self.execute_for(tables, 'create_all')
+        self._execute_for(tables, 'create_all')
 
 
 class FlaskFastAlchemy(FastAlchemy):
